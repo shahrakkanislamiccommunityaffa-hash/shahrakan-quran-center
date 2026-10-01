@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تسجيل الدخول | مركز شهركان الإسلامي</title><link rel="stylesheet" href="style.css">
+</head>
+<body class="login-page">
+<div class="login-card">
+  <div class="logo">☪</div>
+  <h1>مركز شهركان الإسلامي</h1>
+  <p>نظام إدارة تعليم القرآن الكريم</p>
+  <div id="err" class="error hidden"></div>
+  <label>اسم المستخدم</label>
+  <input id="username" autocomplete="username" placeholder="اسم المستخدم">
+  <label>كلمة المرور</label>
+  <input id="password" type="password" autocomplete="current-password" placeholder="كلمة المرور">
+  <button class="primary full" onclick="login()">تسجيل الدخول</button>
+</div>
+<script>
+async function login(){
+ const err=document.getElementById('err'); err.classList.add('hidden');
+ const username=document.getElementById('username').value.trim();
+ const password=document.getElementById('password').value;
+ const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+ const d=await r.json();
+ if(!r.ok){err.textContent=d.error||'خطأ';err.classList.remove('hidden');return;}
+ location.href='/dashboard.html';
+}
+document.getElementById('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+</script>
+</body></html>

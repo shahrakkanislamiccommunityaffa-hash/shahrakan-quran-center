@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة التحكم | مركز شهركان الإسلامي</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div><b>☪ مركز شهركان الإسلامي</b><span class="sub">تعليم القرآن الكريم</span></div>
+  <div><span id="userBadge" class="badge"></span><button class="logout" onclick="logout()">خروج</button></div>
+</header>
+<main class="container">
+  <section class="welcome card">
+    <div><h2>لوحة التحكم</h2><p>اختر نوع الحضور الذي تريد تسجيله.</p></div>
+    <div class="stats">
+      <div><b id="sStudents">0</b><span>الطلاب</span></div>
+      <div><b id="sTeachers">0</b><span>المعلمون</span></div>
+      <div><b id="sClasses">0</b><span>الصفوف</span></div>
+    </div>
+  </section>
+
+  <nav class="menu">
+    <button class="menu-btn active" onclick="showTab('students')">📚 حضور الطلاب</button>
+    <button class="menu-btn" onclick="showTab('teachers')">👨‍🏫 حضور المعلمين</button>
+    <button class="menu-btn" onclick="showTab('manage')">⚙️ إدارة البيانات</button>
+  </nav>
+
+  <section id="studentsTab">
+    <div class="card">
+      <div class="section-head"><h2>تسجيل حضور الطلاب</h2><span id="studentMsg" class="success"></span></div>
+      <div class="grid4">
+        <div><label>التاريخ</label><input type="date" id="studentDate"></div>
+        <div><label>الصف</label><select id="studentClass" onchange="loadStudentRows()"></select></div>
+        <div><label>الملف</label><input id="studentFile" placeholder="مثال: ملف الفجر"></div>
+        <div><label>الأستاذ</label><input id="studentTeacher" placeholder="اسم الأستاذ"></div>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>اسم الطالب</th><th>المستوى</th><th>رقم ولي الأمر</th><th>الحضور</th><th>الملاحظات</th></tr></thead>
+        <tbody id="studentRows"></tbody></table>
+      </div>
+      <button class="primary" onclick="saveStudentAttendance()">💾 حفظ حضور الطلاب</button>
+    </div>
+  </section>
+
+  <section id="teachersTab" class="hidden">
+    <div class="card">
+      <div class="section-head"><h2>تسجيل حضور المعلمين</h2><span id="teacherMsg" class="success"></span></div>
+      <div class="grid2"><div><label>التاريخ</label><input type="date" id="teacherDate"></div></div>
+      <div class="table-wrap">
+        <table><thead><tr><th>المعلم</th><th>الصف</th><th>الهاتف</th><th>الحضور</th><th>الملاحظات</th></tr></thead>
+        <tbody id="teacherRows"></tbody></table>
+      </div>
+      <button class="primary" onclick="saveTeacherAttendance()">💾 حفظ حضور المعلمين</button>
+    </div>
+  </section>
+
+  <section id="manageTab" class="hidden">
+    <div class="grid2">
+      <div class="card">
+        <h2>إضافة صف / ملف</h2>
+        <label>المرحلة أو الصف</label><input id="classGrade" placeholder="مثال: الصف الأول">
+        <label>اسم الملف</label><input id="className" placeholder="مثال: ملف النور">
+        <label>الأستاذ</label><input id="classTeacher" placeholder="اسم الأستاذ">
+        <button class="primary" onclick="addClass()">إضافة الصف</button>
+        <div id="classesList" class="list"></div>
+      </div>
+      <div class="card">
+        <h2>إضافة طالب</h2>
+        <label>اسم الطالب</label><input id="newStudentName">
+        <label>المستوى</label><input id="newStudentLevel" placeholder="مثال: المستوى الثاني">
+        <label>رقم ولي الأمر</label><input id="newParentPhone">
+        <label>الصف / الملف</label><select id="newStudentClass"></select>
+        <label>الملاحظات</label><textarea id="newStudentNotes"></textarea>
+        <button class="primary" onclick="addStudent()">إضافة الطالب</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>إضافة معلم</h2>
+      <div class="grid4">
+        <div><label>اسم المعلم</label><input id="newTeacherName"></div>
+        <div><label>رقم الهاتف</label><input id="newTeacherPhone"></div>
+        <div><label>الصف</label><select id="newTeacherClass"></select></div>
+        <div><label>الملاحظات</label><input id="newTeacherNotes"></div>
+      </div>
+      <button class="primary" onclick="addTeacher()">إضافة المعلم</button>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body></html>
