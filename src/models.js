@@ -1,55 +1,46 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
-  username:{type:String,unique:true,required:true},
-  passwordHash:{type:String,required:true},
-  role:{type:String,default:'admin'}
-},{timestamps:true});
+  username: { type: String, unique: true, required: true, trim: true },
+  passwordHash: { type: String, required: true }
+});
 
-const ClassRoomSchema = new mongoose.Schema({
-  grade:String,
-  name:{type:String,required:true},
-  teacher:String
-},{timestamps:true});
+// مجموعة تعليمية: إما "صف" (ضمن مرحلة الصفوف) أو "ملف" (حلقة مصغرة)
+const GroupSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  stage: { type: String, enum: ['صفوف', 'ملفات'], required: true },
+  teacher: { type: String, trim: true, default: '' }
+});
 
 const StudentSchema = new mongoose.Schema({
-  name:{type:String,required:true},
-  level:String,
-  parentPhone:String,
-  notes:String,
-  classId:{type:mongoose.Schema.Types.ObjectId,ref:'ClassRoom',required:true}
-},{timestamps:true});
+  name: { type: String, required: true, trim: true },
+  groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
+  level: { type: String, trim: true, default: '' },
+  parentPhone: { type: String, trim: true, default: '' },
+  notes: { type: String, trim: true, default: '' }
+});
 
-const TeacherSchema = new mongoose.Schema({
-  name:{type:String,required:true},
-  phone:String,
-  classId:{type:mongoose.Schema.Types.ObjectId,ref:'ClassRoom',default:null},
-  notes:String
-},{timestamps:true});
+// سجل حضور طالب بتاريخ معيّن
+const AttendanceSchema = new mongoose.Schema({
+  studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
+  groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
+  date: { type: String, required: true }, // YYYY-MM-DD
+  status: { type: String, enum: ['حاضر', 'غائب'], required: true },
+  level: { type: String, trim: true, default: '' },
+  notes: { type: String, trim: true, default: '' }
+}, { timestamps: true });
+AttendanceSchema.index({ studentId: 1, date: 1 }, { unique: true });
 
-const StudentAttendanceSchema = new mongoose.Schema({
-  date:{type:String,required:true},
-  classId:{type:mongoose.Schema.Types.ObjectId,ref:'ClassRoom',required:true},
-  studentId:{type:mongoose.Schema.Types.ObjectId,ref:'Student',required:true},
-  teacher:String,
-  status:{type:String,enum:['present','absent','late','excused'],default:'present'},
-  notes:String
-},{timestamps:true});
-StudentAttendanceSchema.index({date:1,classId:1,studentId:1},{unique:true});
-
+// سجل حضور معلم: اسمه وتاريخه بس
 const TeacherAttendanceSchema = new mongoose.Schema({
-  date:{type:String,required:true},
-  teacherId:{type:mongoose.Schema.Types.ObjectId,ref:'Teacher',required:true},
-  status:{type:String,enum:['present','absent','late','excused'],default:'present'},
-  notes:String
-},{timestamps:true});
-TeacherAttendanceSchema.index({date:1,teacherId:1},{unique:true});
+  teacherName: { type: String, required: true, trim: true },
+  date: { type: String, required: true } // YYYY-MM-DD
+}, { timestamps: true });
 
-module.exports={
-  User:mongoose.model('User',UserSchema),
-  ClassRoom:mongoose.model('ClassRoom',ClassRoomSchema),
-  Student:mongoose.model('Student',StudentSchema),
-  Teacher:mongoose.model('Teacher',TeacherSchema),
-  StudentAttendance:mongoose.model('StudentAttendance',StudentAttendanceSchema),
-  TeacherAttendance:mongoose.model('TeacherAttendance',TeacherAttendanceSchema)
+module.exports = {
+  User: mongoose.model('User', UserSchema),
+  Group: mongoose.model('Group', GroupSchema),
+  Student: mongoose.model('Student', StudentSchema),
+  Attendance: mongoose.model('Attendance', AttendanceSchema),
+  TeacherAttendance: mongoose.model('TeacherAttendance', TeacherAttendanceSchema)
 };

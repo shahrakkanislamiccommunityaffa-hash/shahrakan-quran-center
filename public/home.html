@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تعليم القرآن - مركز شهركان الإسلامي</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <span style="display:flex;align-items:center;gap:8px;">
+    <img src="logo.png" alt="شعار" style="width:28px;height:28px;object-fit:contain;">
+    تعليم القرآن
+  </span>
+  <button onclick="logout()">خروج</button>
+</header>
+<main>
+  <h2 style="text-align:center;color:var(--muted);font-weight:normal;">وش تبي تسجّل اليوم؟</h2>
+  <div class="choice-grid">
+    <a class="choice-card" href="teachers.html">
+      <div class="icon">👨‍🏫</div>
+      <h3>تسجيل حضور المعلمين</h3>
+      <p class="hint">اسم المعلم والتاريخ</p>
+    </a>
+    <a class="choice-card" href="students.html">
+      <div class="icon">🎓</div>
+      <h3>تسجيل حضور الطلاب</h3>
+      <p class="hint">الصفوف والملفات (الحلقات)</p>
+    </a>
+  </div>
+</main>
+<script>
+async function logout(){
+  await fetch('/api/logout', {method:'POST'});
+  location.href = '/login.html';
+}
+// تأكد إن فيه جلسة فعلاً
+fetch('/api/me').then(r=>{ if(!r.ok) location.href='/login.html'; });
+</script>
+</body>
+</html>

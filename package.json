@@ -1,10 +1,14 @@
 {
-  "name": "shahrakan-quran-center",
+  "name": "quran-attendance-shahrakkan",
   "version": "1.0.0",
-  "description": "نظام إدارة حضور مركز شهركان الإسلامي لتعليم القرآن",
+  "description": "موقع تسجيل حضور تعليم القرآن - مركز شهركان الإسلامي",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18.0.0" },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",

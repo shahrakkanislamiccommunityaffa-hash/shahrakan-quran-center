@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حضور الطلاب</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  🎓 حضور الطلاب
+  <a href="home.html" style="color:#fff;text-decoration:none;">⬅ الرئيسية</a>
+</header>
+<main>
+
+<div class="card">
+  <div class="row">
+    <button id="stageClassesBtn" onclick="setStage('صفوف')">📚 الصفوف</button>
+    <button id="stageCirclesBtn" class="secondary" onclick="setStage('ملفات')">🕋 الملفات (الحلقات)</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2 id="groupsTitle">الصفوف</h2>
+  <div id="groupGrid" class="group-grid"></div>
+  <hr style="border-color:var(--border);margin:16px 0;">
+  <label>إضافة جديد</label>
+  <div class="row">
+    <input id="newGroupName" placeholder="اسم الصف/الملف">
+    <input id="newGroupTeacher" placeholder="اسم الأستاذ">
+    <button onclick="addGroup()">إضافة</button>
+  </div>
+</div>
+
+<div id="groupDetail" style="display:none;">
+
+  <div class="card">
+    <h2 id="selectedGroupName"></h2>
+    <p class="hint" id="selectedGroupTeacher"></p>
+    <button class="danger" onclick="deleteGroup()">🗑 حذف هذا الصف/الملف</button>
+  </div>
+
+  <div class="card">
+    <h2 id="studentFormTitle">إضافة طالب جديد</h2>
+    <div class="row">
+      <div><label>اسم الطالب</label><input id="sName"></div>
+      <div><label>المستوى</label><input id="sLevel" placeholder="مثال: الجزء الأول"></div>
+    </div>
+    <div class="row">
+      <div><label>رقم ولي الأمر</label><input id="sPhone" placeholder="مثال: 97333xxxxxx"></div>
+      <div><label>ملاحظات عامة</label><input id="sNotes"></div>
+    </div>
+    <button onclick="saveStudent()" id="studentSaveBtn">➕ إضافة الطالب</button>
+    <button class="secondary" onclick="cancelEditStudent()" id="studentCancelBtn" style="display:none;">إلغاء</button>
+  </div>
+
+  <div class="card">
+    <h2>تسجيل الحضور</h2>
+    <div class="row">
+      <div><label>التاريخ</label><input id="attDate" type="date"></div>
+    </div>
+    <div id="studentsList"></div>
+    <button onclick="saveAttendance()" style="margin-top:10px;">💾 حفظ الحضور</button>
+    <p id="saveStatus" class="hint"></p>
+  </div>
+
+</div>
+
+</main>
+<script>
+async function api(path, opts={}){
+  const res = await fetch(path, { headers:{'Content-Type':'application/json'}, ...opts });
+  if(res.status===401){ location.href='/login.html'; throw new Error('unauth'); }
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || 'خطأ');
+  return data;
+}
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+let stage = 'صفوف';
+let groups = [];
+let selectedGroup = null;
+let students = [];
+let attendanceMap = {}; // studentId -> {status, notes}
+let editingStudentId = null;
+
+document.getElementById('attDate').value = todayStr();
+
+function setStage(s){
+  stage = s;
+  document.getElementById('stageClassesBtn').className = s==='صفوف' ? '' : 'secondary';
+  document.getElementById('stageCirclesBtn').className = s==='ملفات' ? '' : 'secondary';
+  document.getElementById('groupsTitle').textContent = s==='صفوف' ? 'الصفوف' : 'الملفات (الحلقات)';
+  selectedGroup = null;
+  document.getElementById('groupDetail').style.display = 'none';
+  loadGroups();
+}
+
+async function loadGroups(){
+  groups = await api('/api/groups?stage='+encodeURIComponent(stage));
+  const el = document.getElementById('groupGrid');
+  if(!groups.length){ el.innerHTML = '<p class="hint">ما فيه صفوف/ملفات مضافة بعد.</p>'; return; }
+  el.innerHTML = groups.map(g=>`
+    <div class="group-chip ${selectedGroup && selectedGroup._id===g._id ? 'active':''}" onclick="selectGroup('${g._id}')">
+      ${esc(g.name)}
+      <span class="t">${esc(g.teacher||'بدون أستاذ')}</span>
+    </div>`).join('');
+}
+
+async function addGroup(){
+  const name = document.getElementById('newGroupName').value.trim();
+  const teacher = document.getElementById('newGroupTeacher').value.trim();
+  if(!name) return alert('اكتب الاسم');
+  await api('/api/groups', {method:'POST', body: JSON.stringify({name, stage, teacher})});
+  document.getElementById('newGroupName').value=''; document.getElementById('newGroupTeacher').value='';
+  await loadGroups();
+}
+
+async function deleteGroup(){
+  if(!selectedGroup) return;
+  if(!confirm('تأكيد حذف "'+selectedGroup.name+'"؟')) return;
+  try{
+    await api('/api/groups/'+selectedGroup._id, {method:'DELETE'});
+    selectedGroup = null;
+    document.getElementById('groupDetail').style.display = 'none';
+    await loadGroups();
+  }catch(e){ alert(e.message); }
+}
+
+async function selectGroup(id){
+  selectedGroup = groups.find(g=>g._id===id);
+  await loadGroups(); // لتحديث التظليل
+  document.getElementById('groupDetail').style.display = 'block';
+  document.getElementById('selectedGroupName').textContent = selectedGroup.name;
+  document.getElementById('selectedGroupTeacher').textContent = selectedGroup.teacher ? ('الأستاذ: '+selectedGroup.teacher) : 'بدون أستاذ محدد';
+  cancelEditStudent();
+  await loadStudents();
+}
+
+async function loadStudents(){
+  students = await api('/api/students?groupId='+selectedGroup._id);
+  await loadAttendance();
+}
+
+async function loadAttendance(){
+  const date = document.getElementById('attDate').value;
+  const records = await api(`/api/attendance?groupId=${selectedGroup._id}&date=${date}`);
+  attendanceMap = {};
+  records.forEach(r=>{ attendanceMap[r.studentId] = {status: r.status, notes: r.notes}; });
+  renderStudents();
+}
+
+function renderStudents(){
+  const el = document.getElementById('studentsList');
+  if(!students.length){ el.innerHTML = '<p class="hint">ما فيه طلاب بهذا الصف/الملف بعد.</p>'; return; }
+  el.innerHTML = students.map(s=>{
+    const a = attendanceMap[s._id] || {status:'', notes:''};
+    const meta = [s.level, s.parentPhone].filter(Boolean).join(' · ');
+    return `
+    <div class="stu-row">
+      <div class="stu-name">${esc(s.name)}</div>
+      <div class="stu-meta">${esc(meta || '—')}${s.notes ? ' | '+esc(s.notes) : ''}</div>
+      <div class="stu-status">
+        <button class="present ${a.status==='حاضر'?'on':''}" onclick="setStatus('${s._id}','حاضر')">حاضر</button>
+        <button class="absent ${a.status==='غائب'?'on':''}" onclick="setStatus('${s._id}','غائب')">غائب</button>
+      </div>
+      <div class="stu-notes"><input placeholder="ملاحظة اليوم" value="${esc(a.notes||'')}" onchange="setNote('${s._id}', this.value)"></div>
+      <button class="secondary" onclick="editStudent('${s._id}')">✏️</button>
+      <button class="danger" onclick="deleteStudent('${s._id}')">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function setStatus(studentId, status){
+  attendanceMap[studentId] = attendanceMap[studentId] || {};
+  attendanceMap[studentId].status = status;
+  renderStudents();
+}
+function setNote(studentId, notes){
+  attendanceMap[studentId] = attendanceMap[studentId] || {};
+  attendanceMap[studentId].notes = notes;
+}
+
+async function saveAttendance(){
+  const date = document.getElementById('attDate').value;
+  const records = students
+    .filter(s => attendanceMap[s._id] && attendanceMap[s._id].status)
+    .map(s => ({ studentId: s._id, status: attendanceMap[s._id].status, notes: attendanceMap[s._id].notes || '' }));
+  const status = document.getElementById('saveStatus');
+  status.textContent = 'جاري الحفظ...';
+  await api('/api/attendance/bulk', {method:'POST', body: JSON.stringify({groupId: selectedGroup._id, date, records})});
+  status.textContent = `تم حفظ حضور ${records.length} طالب بتاريخ ${date}.`;
+}
+
+document.getElementById('attDate').addEventListener('change', loadAttendance);
+
+function editStudent(id){
+  const s = students.find(x=>x._id===id);
+  if(!s) return;
+  editingStudentId = id;
+  document.getElementById('sName').value = s.name;
+  document.getElementById('sLevel').value = s.level || '';
+  document.getElementById('sPhone').value = s.parentPhone || '';
+  document.getElementById('sNotes').value = s.notes || '';
+  document.getElementById('studentFormTitle').textContent = 'تعديل بيانات الطالب';
+  document.getElementById('studentSaveBtn').textContent = '💾 حفظ التعديل';
+  document.getElementById('studentCancelBtn').style.display = 'inline-block';
+  window.scrollTo({top: document.getElementById('studentFormTitle').offsetTop - 20, behavior:'smooth'});
+}
+function cancelEditStudent(){
+  editingStudentId = null;
+  document.getElementById('sName').value = '';
+  document.getElementById('sLevel').value = '';
+  document.getElementById('sPhone').value = '';
+  document.getElementById('sNotes').value = '';
+  document.getElementById('studentFormTitle').textContent = 'إضافة طالب جديد';
+  document.getElementById('studentSaveBtn').textContent = '➕ إضافة الطالب';
+  document.getElementById('studentCancelBtn').style.display = 'none';
+}
+
+async function saveStudent(){
+  const name = document.getElementById('sName').value.trim();
+  const level = document.getElementById('sLevel').value.trim();
+  const parentPhone = document.getElementById('sPhone').value.trim();
+  const notes = document.getElementById('sNotes').value.trim();
+  if(!name) return alert('اكتب اسم الطالب');
+  if(editingStudentId){
+    await api('/api/students/'+editingStudentId, {method:'PUT', body: JSON.stringify({name, level, parentPhone, notes})});
+  } else {
+    await api('/api/students', {method:'POST', body: JSON.stringify({name, level, parentPhone, notes, groupId: selectedGroup._id})});
+  }
+  cancelEditStudent();
+  await loadStudents();
+}
+
+async function deleteStudent(id){
+  if(!confirm('تأكيد حذف الطالب؟ بيحذف كل سجلات حضوره كمان.')) return;
+  await api('/api/students/'+id, {method:'DELETE'});
+  await loadStudents();
+}
+
+(async function init(){
+  try{ await api('/api/me'); }catch(e){ return; }
+  await loadGroups();
+})();
+</script>
+</body>
+</html>
