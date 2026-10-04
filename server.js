@@ -53,7 +53,9 @@ app.get('/api/me', requireAuth, (req, res) => {
 app.get('/api/groups', requireAuth, async (req, res) => {
   const filter = {};
   if (req.query.stage) filter.stage = req.query.stage;
-  const groups = await Group.find(filter).sort({ name: 1 });
+  const groups = await Group.find(filter)
+    .collation({ locale: 'ar', numericOrdering: true })
+    .sort({ name: 1 });
   res.json(groups);
 });
 

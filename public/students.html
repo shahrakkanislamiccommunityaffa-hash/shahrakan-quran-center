@@ -100,6 +100,7 @@ function setStage(s){
 
 async function loadGroups(){
   groups = await api('/api/groups?stage='+encodeURIComponent(stage));
+  groups.sort((a,b)=>a.name.localeCompare(b.name, 'ar', {numeric:true}));
   const el = document.getElementById('groupGrid');
   if(!groups.length){ el.innerHTML = '<p class="hint">ما فيه صفوف/ملفات مضافة بعد.</p>'; return; }
   el.innerHTML = groups.map(g=>`
