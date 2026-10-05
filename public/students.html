@@ -38,7 +38,20 @@
   <div class="card">
     <h2 id="selectedGroupName"></h2>
     <p class="hint" id="selectedGroupTeacher"></p>
-    <button class="danger" onclick="deleteGroup()">🗑 حذف هذا الصف/الملف</button>
+
+    <div id="groupEditForm" style="display:none;margin:10px 0;">
+      <div class="row">
+        <div><label>اسم الصف/الملف</label><input id="editGroupName"></div>
+        <div><label>اسم الأستاذ</label><input id="editGroupTeacher"></div>
+      </div>
+      <button onclick="saveGroupEdit()">💾 حفظ التعديل</button>
+      <button class="secondary" onclick="cancelGroupEdit()">إلغاء</button>
+    </div>
+
+    <div id="groupActions">
+      <button onclick="startGroupEdit()">✏️ تعديل الاسم والأستاذ</button>
+      <button class="danger" onclick="deleteGroup()">🗑 حذف هذا الصف/الملف</button>
+    </div>
   </div>
 
   <div class="card">
@@ -155,12 +168,34 @@ async function deleteGroup(){
   }catch(e){ alert(e.message); }
 }
 
+function startGroupEdit(){
+  if(!selectedGroup) return;
+  document.getElementById('editGroupName').value = selectedGroup.name;
+  document.getElementById('editGroupTeacher').value = selectedGroup.teacher || '';
+  document.getElementById('groupEditForm').style.display = 'block';
+  document.getElementById('groupActions').style.display = 'none';
+}
+function cancelGroupEdit(){
+  document.getElementById('groupEditForm').style.display = 'none';
+  document.getElementById('groupActions').style.display = 'block';
+}
+async function saveGroupEdit(){
+  const name = document.getElementById('editGroupName').value.trim();
+  const teacher = document.getElementById('editGroupTeacher').value.trim();
+  if(!name) return alert('اكتب اسم الصف/الملف');
+  const updated = await api('/api/groups/'+selectedGroup._id, {method:'PUT', body: JSON.stringify({name, teacher})});
+  cancelGroupEdit();
+  await loadGroups();
+  await selectGroup(updated._id);
+}
+
 async function selectGroup(id){
   selectedGroup = groups.find(g=>g._id===id);
   await loadGroups(); // لتحديث التظليل
   document.getElementById('groupDetail').style.display = 'block';
   document.getElementById('selectedGroupName').textContent = selectedGroup.name;
   document.getElementById('selectedGroupTeacher').textContent = selectedGroup.teacher ? ('الأستاذ: '+selectedGroup.teacher) : 'بدون أستاذ محدد';
+  cancelGroupEdit();
   cancelEditStudent();
   await loadStudents();
 }
