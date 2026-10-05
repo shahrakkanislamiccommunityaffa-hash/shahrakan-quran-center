@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 
-const { User, Group, Student, Attendance, TeacherAttendance } = require('./src/models');
+const { User, Group, Student, Attendance, Teacher, TeacherAttendance } = require('./src/models');
 const { signToken, setAuthCookie, clearAuthCookie, requireAuth } = require('./src/auth');
 
 const app = express();
@@ -165,6 +165,26 @@ app.get('/api/students/:id/history', requireAuth, async (req, res) => {
   res.json(records);
 });
 
+// ---------- قائمة المعلمين ----------
+app.get('/api/teachers', requireAuth, async (req, res) => {
+  const teachers = await Teacher.find().collation({ locale: 'ar' }).sort({ name: 1 });
+  res.json(teachers);
+});
+
+app.post('/api/teachers', requireAuth, async (req, res) => {
+  const name = (req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'اسم المعلم مطلوب' });
+  const exists = await Teacher.findOne({ name });
+  if (exists) return res.status(400).json({ error: 'هذا المعلم موجود مسبقاً' });
+  const teacher = await Teacher.create({ name });
+  res.json(teacher);
+});
+
+app.delete('/api/teachers/:id', requireAuth, async (req, res) => {
+  await Teacher.findByIdAndDelete(req.params.id);
+  res.json({ ok: true });
+});
+
 // ---------- حضور المعلمين ----------
 app.get('/api/teacher-attendance', requireAuth, async (req, res) => {
   const filter = {};
@@ -176,7 +196,11 @@ app.get('/api/teacher-attendance', requireAuth, async (req, res) => {
 app.post('/api/teacher-attendance', requireAuth, async (req, res) => {
   const { teacherName, date } = req.body || {};
   if (!teacherName || !date) return res.status(400).json({ error: 'اسم المعلم والتاريخ مطلوبين' });
-  const record = await TeacherAttendance.create({ teacherName: teacherName.trim(), date });
+  const name = teacherName.trim();
+  // لا نكرر نفس المعلم بنفس اليوم
+  const existing = await TeacherAttendance.findOne({ teacherName: name, date });
+  if (existing) return res.json(existing);
+  const record = await TeacherAttendance.create({ teacherName: name, date });
   res.json(record);
 });
 

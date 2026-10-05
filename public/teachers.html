@@ -6,6 +6,15 @@
 <title>حضور المعلمين</title>
 <link rel="icon" type="image/png" href="logo.png">
 <link rel="stylesheet" href="style.css">
+<style>
+.t-row{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);}
+.t-row:last-child{border-bottom:none;}
+.t-name{flex:1;font-weight:bold;font-size:15px;}
+.t-btn{min-width:110px;background:transparent;border:1px solid var(--border);color:var(--text);}
+.t-btn:hover{background:transparent;border-color:var(--accent);}
+.t-btn.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.t-btn.on:hover{background:var(--accent-dark);}
+</style>
 </head>
 <body>
 <header>
@@ -15,19 +24,24 @@
 <main>
 
 <div class="card">
-  <h2>تسجيل حضور جديد</h2>
+  <h2>تسجيل الحضور</h2>
   <div class="row">
-    <div>
-      <label>اسم المعلم</label>
-      <input id="tName" list="namesList" placeholder="اكتب اسم المعلم">
-      <datalist id="namesList"></datalist>
-    </div>
     <div>
       <label>التاريخ</label>
       <input id="tDate" type="date">
     </div>
   </div>
-  <button onclick="addAttendance()">✅ تسجيل حضور</button>
+  <p class="hint">اضغط على الزر جنب اسم المعلم لتسجيل حضوره بهذا التاريخ، واضغط مرة ثانية لإلغاء التسجيل.</p>
+  <div id="teachersAttendance"></div>
+</div>
+
+<div class="card">
+  <h2>إدارة قائمة المعلمين</h2>
+  <div class="row">
+    <input id="newTeacher" placeholder="اسم المعلم الجديد">
+    <button onclick="addTeacher()">➕ إضافة</button>
+  </div>
+  <div id="teachersManage" style="margin-top:10px;"></div>
 </div>
 
 <div class="card">
@@ -54,29 +68,85 @@ async function api(path, opts={}){
   return data;
 }
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+function todayStr(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+
+let teachers = [];
+let dayRecords = []; // سجلات التاريخ المختار
 
 document.getElementById('tDate').value = todayStr();
 
-async function loadNames(){
-  const all = await api('/api/teacher-attendance');
-  const names = [...new Set(all.map(r=>r.teacherName))];
-  document.getElementById('namesList').innerHTML = names.map(n=>`<option value="${esc(n)}">`).join('');
+async function loadTeachers(){
+  teachers = await api('/api/teachers');
+  renderManage();
+  await loadDay();
 }
 
-async function addAttendance(){
-  const teacherName = document.getElementById('tName').value.trim();
+async function loadDay(){
   const date = document.getElementById('tDate').value;
-  if(!teacherName || !date) return alert('اكتب الاسم واختر التاريخ');
-  await api('/api/teacher-attendance', {method:'POST', body: JSON.stringify({teacherName, date})});
-  document.getElementById('tName').value = '';
-  await loadNames();
+  dayRecords = date ? await api('/api/teacher-attendance?date='+date) : [];
+  renderAttendance();
+}
+
+function renderAttendance(){
+  const el = document.getElementById('teachersAttendance');
+  if(!teachers.length){ el.innerHTML = '<p class="hint">ما فيه معلمين مضافين بعد — أضفهم من "إدارة قائمة المعلمين" تحت.</p>'; return; }
+  el.innerHTML = teachers.map(t=>{
+    const rec = dayRecords.find(r=>r.teacherName===t.name);
+    return `<div class="t-row">
+      <span class="t-name">${esc(t.name)}</span>
+      <button class="t-btn ${rec?'on':''}" onclick="toggle('${t._id}')">${rec?'✅ حاضر':'تسجيل حضور'}</button>
+    </div>`;
+  }).join('');
+}
+
+async function toggle(teacherId){
+  const t = teachers.find(x=>x._id===teacherId);
+  const date = document.getElementById('tDate').value;
+  if(!t || !date) return alert('اختر التاريخ');
+  const rec = dayRecords.find(r=>r.teacherName===t.name);
+  if(rec) await api('/api/teacher-attendance/'+rec._id, {method:'DELETE'});
+  else await api('/api/teacher-attendance', {method:'POST', body: JSON.stringify({teacherName: t.name, date})});
+  await loadDay();
   await loadList();
+}
+
+function renderManage(){
+  const el = document.getElementById('teachersManage');
+  if(!teachers.length){ el.innerHTML = '<p class="hint">ما فيه معلمين مضافين بعد.</p>'; return; }
+  el.innerHTML = teachers.map(t=>`
+    <div class="item">
+      <span>${esc(t.name)}</span>
+      <button class="danger" onclick="removeTeacher('${t._id}')">حذف</button>
+    </div>`).join('');
+}
+
+async function addTeacher(){
+  const input = document.getElementById('newTeacher');
+  const name = input.value.trim();
+  if(!name) return alert('اكتب اسم المعلم');
+  try{
+    await api('/api/teachers', {method:'POST', body: JSON.stringify({name})});
+    input.value = '';
+    await loadTeachers();
+  }catch(e){ alert(e.message); }
+}
+document.getElementById('newTeacher').addEventListener('keydown', e=>{ if(e.key==='Enter') addTeacher(); });
+
+async function removeTeacher(id){
+  const t = teachers.find(x=>x._id===id);
+  if(!confirm('حذف "'+(t?t.name:'')+'" من القائمة؟ (سجلات حضوره السابقة تبقى محفوظة)')) return;
+  await api('/api/teachers/'+id, {method:'DELETE'});
+  await loadTeachers();
 }
 
 async function removeRecord(id){
   if(!confirm('حذف هذا السجل؟')) return;
   await api('/api/teacher-attendance/'+id, {method:'DELETE'});
+  await loadDay();
   await loadList();
 }
 
@@ -93,11 +163,14 @@ async function loadList(){
     </div>`).join('');
 }
 
+function clearFilter(){ document.getElementById('filterDate').value=''; loadList(); }
+
+document.getElementById('tDate').addEventListener('change', loadDay);
 document.getElementById('filterDate').addEventListener('change', loadList);
 
 (async function init(){
   try{ await api('/api/me'); }catch(e){ return; }
-  await loadNames();
+  await loadTeachers();
   await loadList();
 })();
 </script>

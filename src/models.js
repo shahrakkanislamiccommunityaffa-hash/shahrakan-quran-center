@@ -31,6 +31,11 @@ const AttendanceSchema = new mongoose.Schema({
 }, { timestamps: true });
 AttendanceSchema.index({ studentId: 1, date: 1 }, { unique: true });
 
+// قائمة المعلمين (تنضاف مرة وحدة وتُختار منها عند تسجيل الحضور)
+const TeacherSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true, unique: true }
+});
+
 // سجل حضور معلم: اسمه وتاريخه بس
 const TeacherAttendanceSchema = new mongoose.Schema({
   teacherName: { type: String, required: true, trim: true },
@@ -42,5 +47,6 @@ module.exports = {
   Group: mongoose.model('Group', GroupSchema),
   Student: mongoose.model('Student', StudentSchema),
   Attendance: mongoose.model('Attendance', AttendanceSchema),
+  Teacher: mongoose.model('Teacher', TeacherSchema),
   TeacherAttendance: mongoose.model('TeacherAttendance', TeacherAttendanceSchema)
 };
