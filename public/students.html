@@ -45,7 +45,7 @@
     <h2 id="studentFormTitle">إضافة طالب جديد</h2>
     <div class="row">
       <div><label>اسم الطالب</label><input id="sName"></div>
-      <div><label>المستوى</label><input id="sLevel" placeholder="مثال: الجزء الأول"></div>
+      <div id="levelField"><label>المستوى</label><input id="sLevel" placeholder="مثال: الجزء الأول"></div>
     </div>
     <div class="row">
       <div><label>رقم ولي الأمر</label><input id="sPhone" placeholder="مثال: 97333xxxxxx"></div>
@@ -106,8 +106,15 @@ function compareGroups(a,b){
   return a.name.localeCompare(b.name, 'ar', {numeric:true});
 }
 
+function applyStageUI(){
+  // المستوى يخص الملفات (الحلقات) فقط — ما يظهر بمرحلة الصفوف
+  const lf = document.getElementById('levelField');
+  if(lf) lf.style.display = stage==='ملفات' ? '' : 'none';
+}
+
 function setStage(s){
   stage = s;
+  applyStageUI();
   document.getElementById('stageClassesBtn').className = s==='صفوف' ? '' : 'secondary';
   document.getElementById('stageCirclesBtn').className = s==='ملفات' ? '' : 'secondary';
   document.getElementById('groupsTitle').textContent = s==='صفوف' ? 'الصفوف' : 'الملفات (الحلقات)';
@@ -176,7 +183,7 @@ function renderStudents(){
   if(!students.length){ el.innerHTML = '<p class="hint">ما فيه طلاب بهذا الصف/الملف بعد.</p>'; return; }
   el.innerHTML = students.map(s=>{
     const a = attendanceMap[s._id] || {status:'', notes:''};
-    const meta = [s.level, s.parentPhone].filter(Boolean).join(' · ');
+    const meta = [stage==='ملفات' ? s.level : '', s.parentPhone].filter(Boolean).join(' · ');
     return `
     <div class="stu-row">
       <div class="stu-name">${esc(s.name)}</div>
@@ -246,9 +253,9 @@ async function saveStudent(){
   const notes = document.getElementById('sNotes').value.trim();
   if(!name) return alert('اكتب اسم الطالب');
   if(editingStudentId){
-    await api('/api/students/'+editingStudentId, {method:'PUT', body: JSON.stringify({name, level, parentPhone, notes})});
+    await api('/api/students/'+editingStudentId, {method:'PUT', body: JSON.stringify(stage==='ملفات' ? {name, level, parentPhone, notes} : {name, parentPhone, notes})});
   } else {
-    await api('/api/students', {method:'POST', body: JSON.stringify({name, level, parentPhone, notes, groupId: selectedGroup._id})});
+    await api('/api/students', {method:'POST', body: JSON.stringify(stage==='ملفات' ? {name, level, parentPhone, notes, groupId: selectedGroup._id} : {name, parentPhone, notes, groupId: selectedGroup._id})});
   }
   cancelEditStudent();
   await loadStudents();
@@ -262,6 +269,7 @@ async function deleteStudent(id){
 
 (async function init(){
   try{ await api('/api/me'); }catch(e){ return; }
+  applyStageUI();
   await loadGroups();
 })();
 </script>
