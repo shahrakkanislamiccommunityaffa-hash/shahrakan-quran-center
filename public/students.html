@@ -88,6 +88,24 @@ let editingStudentId = null;
 
 document.getElementById('attDate').value = todayStr();
 
+
+// ترتيب الصفوف: القاعدة البغدادية أول شي، بعدها الصفوف حسب ترتيبها (الرابع، الخامس، السادس...)،
+// وأي اسم ثاني (مثل ملف 2، ملف 10) يترتب رقمياً بعدهم.
+const ORDINALS = ['الحادي عشر','الثاني عشر','الاول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر'];
+const ORDINAL_RANK = {'الاول':1,'الثاني':2,'الثالث':3,'الرابع':4,'الخامس':5,'السادس':6,'السابع':7,'الثامن':8,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12};
+function normName(n){ return (n||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/\s+/g,' ').trim(); }
+function groupRank(name){
+  const n = normName(name);
+  if(n.includes('قاعده')) return 0;
+  for(const o of ORDINALS){ if(n.includes(o)) return ORDINAL_RANK[o]; }
+  return 1000;
+}
+function compareGroups(a,b){
+  const ra = groupRank(a.name), rb = groupRank(b.name);
+  if(ra!==rb) return ra-rb;
+  return a.name.localeCompare(b.name, 'ar', {numeric:true});
+}
+
 function setStage(s){
   stage = s;
   document.getElementById('stageClassesBtn').className = s==='صفوف' ? '' : 'secondary';
@@ -100,7 +118,7 @@ function setStage(s){
 
 async function loadGroups(){
   groups = await api('/api/groups?stage='+encodeURIComponent(stage));
-  groups.sort((a,b)=>a.name.localeCompare(b.name, 'ar', {numeric:true}));
+  groups.sort(compareGroups);
   const el = document.getElementById('groupGrid');
   if(!groups.length){ el.innerHTML = '<p class="hint">ما فيه صفوف/ملفات مضافة بعد.</p>'; return; }
   el.innerHTML = groups.map(g=>`
