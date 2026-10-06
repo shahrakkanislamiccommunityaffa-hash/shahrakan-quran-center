@@ -51,6 +51,13 @@ table.rep th small{display:block;font-weight:normal;color:var(--muted);font-size
       <select id="stageFilter"><option value="">الكل (صفوف وملفات)</option><option value="صفوف">الصفوف</option><option value="ملفات">الملفات (الحلقات)</option></select>
     </div>
     <div><label>الصف/الملف</label><select id="groupFilter"><option value="">الكل</option></select></div>
+    <div><label>ترتيب الجدول</label>
+      <select id="sortBy">
+        <option value="alpha">أبجدي (أ ← ي)</option>
+        <option value="present">الأكثر حضوراً</option>
+        <option value="absent">الأكثر غياباً</option>
+      </select>
+    </div>
   </div>
   <div class="days" style="margin:6px 0 12px;">
     <span class="hint">أيام الدراسة:</span>
@@ -138,6 +145,8 @@ async function loadReport(){
   const recMap = {};
   data.records.forEach(r=>{ recMap[r.studentId+'|'+r.date] = r.status; });
 
+  const sortBy = document.getElementById('sortBy').value;
+  const counts = {};
   const students = data.students
     .filter(s=>{
       const g = groupMap[s.groupId];
@@ -145,8 +154,22 @@ async function loadReport(){
       if(stage && g.stage!==stage) return false;
       if(groupId && g._id!==groupId) return false;
       return true;
-    })
-    .sort((a,b)=>sortKey(a.name).localeCompare(sortKey(b.name),'ar'));
+    });
+  students.forEach(s=>{
+    let pc=0, ac=0;
+    dates.forEach(d=>{
+      const st = recMap[s._id+'|'+d.key];
+      if(st==='حاضر') pc++; else if(st==='غائب') ac++;
+    });
+    counts[s._id] = {pc, ac};
+  });
+  const alpha = (a,b)=>sortKey(a.name).localeCompare(sortKey(b.name),'ar');
+  students.sort((a,b)=>{
+    const ca = counts[a._id], cb = counts[b._id];
+    if(sortBy==='present' && cb.pc!==ca.pc) return cb.pc-ca.pc;   // الأكثر حضوراً أولاً
+    if(sortBy==='absent' && cb.ac!==ca.ac) return cb.ac-ca.ac;    // الأكثر غياباً أولاً
+    return alpha(a,b); // عند التساوي (أو الترتيب الأبجدي): أبجدي
+  });
 
   let html = '<thead><tr><th>#</th><th>اسم الطالب</th><th>الصف/الملف</th><th>الأستاذ</th>';
   dates.forEach(d=>{ html += `<th>${d.label}<small>${DAY_NAMES[d.day]}</small></th>`; });
@@ -170,6 +193,7 @@ async function loadReport(){
 
 document.getElementById('stageFilter').addEventListener('change', ()=>{ fillGroupFilter(); loadReport(); });
 document.getElementById('groupFilter').addEventListener('change', loadReport);
+document.getElementById('sortBy').addEventListener('change', loadReport);
 
 (async function init(){
   try{ await api('/api/me'); }catch(e){ return; }
