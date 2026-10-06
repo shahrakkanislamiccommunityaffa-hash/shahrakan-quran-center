@@ -24,7 +24,7 @@ button.danger{background:var(--danger);}
 .error{color:var(--danger);font-size:13px;margin-bottom:10px;}
 
 /* صفحة الاختيار الرئيسية */
-.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:30px;}
+.choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:30px;}
 @media (max-width:600px){.choice-grid{grid-template-columns:1fr;}}
 .choice-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:30px 20px;text-align:center;cursor:pointer;transition:transform .15s;text-decoration:none;color:var(--text);display:block;}
 .choice-card:hover{transform:translateY(-3px);border-color:var(--accent);}

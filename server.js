@@ -165,6 +165,18 @@ app.get('/api/students/:id/history', requireAuth, async (req, res) => {
   res.json(records);
 });
 
+// ---------- كشف الحضور والغياب (تقرير) ----------
+app.get('/api/report/students', requireAuth, async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) return res.status(400).json({ error: 'حدد تاريخ البداية والنهاية' });
+  const [groups, students, records] = await Promise.all([
+    Group.find(),
+    Student.find(),
+    Attendance.find({ date: { $gte: from, $lte: to } })
+  ]);
+  res.json({ groups, students, records });
+});
+
 // ---------- قائمة المعلمين ----------
 app.get('/api/teachers', requireAuth, async (req, res) => {
   const teachers = await Teacher.find().collation({ locale: 'ar' }).sort({ name: 1 });

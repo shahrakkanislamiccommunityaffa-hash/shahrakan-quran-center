@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>كشف الحضور والغياب</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="stylesheet" href="style.css">
+<style>
+main.wide{max-width:1200px;}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;}
+table.rep{border-collapse:collapse;width:100%;font-size:13px;background:var(--card);}
+table.rep th,table.rep td{border:1px solid var(--border);padding:6px 8px;text-align:center;white-space:nowrap;}
+table.rep th{background:#f0efe9;color:var(--accent-dark);position:sticky;top:0;}
+table.rep td.name{text-align:right;font-weight:bold;}
+table.rep td.txt{text-align:right;}
+table.rep th small{display:block;font-weight:normal;color:var(--muted);font-size:11px;}
+.p{color:var(--accent);font-weight:bold;font-size:15px;}
+.a{color:var(--danger);font-weight:bold;font-size:15px;}
+.n{color:#bbb;}
+.days label{display:inline-flex;align-items:center;gap:4px;margin:0 0 0 12px;font-size:13px;color:var(--text);}
+.days input{width:auto;margin:0;}
+.summary{margin:10px 0;color:var(--muted);font-size:13px;}
+.print-title{display:none;text-align:center;margin-bottom:10px;}
+@media print{
+  @page{size:landscape;margin:10mm;}
+  header,.no-print{display:none !important;}
+  body{background:#fff;}
+  main{padding:0;max-width:none;}
+  .card{border:none;padding:0;}
+  .table-wrap{overflow:visible;border:none;}
+  table.rep{font-size:11px;}
+  table.rep th{position:static;background:#eee !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .print-title{display:block;}
+}
+</style>
+</head>
+<body>
+<header>
+  📋 كشف الحضور والغياب
+  <a href="home.html" style="color:#fff;text-decoration:none;">⬅ الرئيسية</a>
+</header>
+<main class="wide">
+
+<div class="card no-print">
+  <h2>خيارات الكشف</h2>
+  <div class="row">
+    <div><label>من تاريخ</label><input id="fromDate" type="date" value="2026-09-12"></div>
+    <div><label>إلى تاريخ</label><input id="toDate" type="date" value="2026-10-05"></div>
+    <div><label>المرحلة</label>
+      <select id="stageFilter"><option value="">الكل (صفوف وملفات)</option><option value="صفوف">الصفوف</option><option value="ملفات">الملفات (الحلقات)</option></select>
+    </div>
+    <div><label>الصف/الملف</label><select id="groupFilter"><option value="">الكل</option></select></div>
+  </div>
+  <div class="days" style="margin:6px 0 12px;">
+    <span class="hint">أيام الدراسة:</span>
+    <label><input type="checkbox" class="dayChk" value="6" checked> السبت</label>
+    <label><input type="checkbox" class="dayChk" value="1" checked> الاثنين</label>
+    <label><input type="checkbox" class="dayChk" value="3" checked> الأربعاء</label>
+    <label><input type="checkbox" class="dayChk" value="0"> الأحد</label>
+    <label><input type="checkbox" class="dayChk" value="2"> الثلاثاء</label>
+    <label><input type="checkbox" class="dayChk" value="4"> الخميس</label>
+    <label><input type="checkbox" class="dayChk" value="5"> الجمعة</label>
+  </div>
+  <button onclick="loadReport()">🔄 تحديث الكشف</button>
+  <button class="secondary" onclick="window.print()">🖨 طباعة</button>
+</div>
+
+<div class="card">
+  <h3 class="print-title">كشف الحضور والغياب — تعليم القرآن، مركز شهركان الإسلامي</h3>
+  <div class="summary" id="summary"></div>
+  <div class="table-wrap"><table class="rep" id="rep"></table></div>
+  <p class="hint" style="margin-top:8px;">✔ حاضر &nbsp; ✘ غائب &nbsp; — لم يُسجَّل</p>
+</div>
+
+</main>
+<script>
+async function api(path, opts={}){
+  const res = await fetch(path, { headers:{'Content-Type':'application/json'}, ...opts });
+  if(res.status===401){ location.href='/login.html'; throw new Error('unauth'); }
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || 'خطأ');
+  return data;
+}
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const DAY_NAMES = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const p2 = n => String(n).padStart(2,'0');
+
+// مفتاح ترتيب أبجدي عربي: يوحّد الألف/الياء/التاء المربوطة ويشيل التشكيل
+function sortKey(name){
+  return (name||'').trim()
+    .replace(/[\u064B-\u065F\u0670]/g,'')
+    .replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه');
+}
+
+function buildDates(from, to, days){
+  const [fy,fm,fd] = from.split('-').map(Number);
+  const [ty,tm,td] = to.split('-').map(Number);
+  const out = [];
+  for(let d = new Date(fy,fm-1,fd), end = new Date(ty,tm-1,td); d <= end; d.setDate(d.getDate()+1)){
+    if(days.includes(d.getDay())){
+      out.push({ key: `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`, day: d.getDay(), label: `${d.getDate()}/${d.getMonth()+1}` });
+    }
+  }
+  return out;
+}
+
+let allGroups = [];
+
+function fillGroupFilter(){
+  const stage = document.getElementById('stageFilter').value;
+  const sel = document.getElementById('groupFilter');
+  const keep = sel.value;
+  const list = allGroups
+    .filter(g=>!stage || g.stage===stage)
+    .sort((a,b)=>a.name.localeCompare(b.name,'ar',{numeric:true}));
+  sel.innerHTML = '<option value="">الكل</option>' + list.map(g=>`<option value="${g._id}">${esc(g.name)}</option>`).join('');
+  if(list.some(g=>g._id===keep)) sel.value = keep;
+}
+
+async function loadReport(){
+  const from = document.getElementById('fromDate').value;
+  const to = document.getElementById('toDate').value;
+  if(!from || !to) return alert('حدد التاريخين');
+  const days = [...document.querySelectorAll('.dayChk:checked')].map(c=>Number(c.value));
+  if(!days.length) return alert('اختر يوم واحد على الأقل');
+
+  const data = await api(`/api/report/students?from=${from}&to=${to}`);
+  allGroups = data.groups;
+  fillGroupFilter();
+
+  const stage = document.getElementById('stageFilter').value;
+  const groupId = document.getElementById('groupFilter').value;
+  const groupMap = {};
+  data.groups.forEach(g=>groupMap[g._id]=g);
+
+  const dates = buildDates(from, to, days);
+  const recMap = {};
+  data.records.forEach(r=>{ recMap[r.studentId+'|'+r.date] = r.status; });
+
+  const students = data.students
+    .filter(s=>{
+      const g = groupMap[s.groupId];
+      if(!g) return false;
+      if(stage && g.stage!==stage) return false;
+      if(groupId && g._id!==groupId) return false;
+      return true;
+    })
+    .sort((a,b)=>sortKey(a.name).localeCompare(sortKey(b.name),'ar'));
+
+  let html = '<thead><tr><th>#</th><th>اسم الطالب</th><th>الصف/الملف</th><th>الأستاذ</th>';
+  dates.forEach(d=>{ html += `<th>${d.label}<small>${DAY_NAMES[d.day]}</small></th>`; });
+  html += '<th>حاضر</th><th>غائب</th></tr></thead><tbody>';
+
+  students.forEach((s,i)=>{
+    const g = groupMap[s.groupId];
+    let pc=0, ac=0, cells='';
+    dates.forEach(d=>{
+      const st = recMap[s._id+'|'+d.key];
+      if(st==='حاضر'){ pc++; cells += '<td class="p">✔</td>'; }
+      else if(st==='غائب'){ ac++; cells += '<td class="a">✘</td>'; }
+      else cells += '<td class="n">—</td>';
+    });
+    html += `<tr><td>${i+1}</td><td class="name">${esc(s.name)}</td><td class="txt">${esc(g.name)}</td><td class="txt">${esc(g.teacher||'—')}</td>${cells}<td class="p">${pc}</td><td class="a">${ac}</td></tr>`;
+  });
+  html += '</tbody>';
+  document.getElementById('rep').innerHTML = students.length ? html : '<tbody><tr><td style="padding:20px;">ما فيه طلاب مطابقين للخيارات المحددة.</td></tr></tbody>';
+  document.getElementById('summary').textContent = `${students.length} طالب — ${dates.length} يوم دراسي (من ${from} إلى ${to})`;
+}
+
+document.getElementById('stageFilter').addEventListener('change', ()=>{ fillGroupFilter(); loadReport(); });
+document.getElementById('groupFilter').addEventListener('change', loadReport);
+
+(async function init(){
+  try{ await api('/api/me'); }catch(e){ return; }
+  await loadReport();
+})();
+</script>
+</body>
+</html>
