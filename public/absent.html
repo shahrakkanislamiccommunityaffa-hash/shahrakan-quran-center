@@ -78,6 +78,22 @@ function waNumber(raw){
   return n;
 }
 
+function waLink(num, text){
+  return `https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(text)}`;
+}
+
+async function copyMsg(i){
+  const text = rows[i].msg;
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  const el = document.getElementById('copied'+i);
+  el.textContent = '✅ تم نسخ الرسالة';
+  setTimeout(()=>{ el.textContent=''; }, 2500);
+}
+
 function buildMessage(studentName, dateStr){
   return `السلام عليكم ورحمة الله وبركاته،
 
@@ -123,7 +139,7 @@ function render(date){
   el.innerHTML = rows.map((x,i)=>{
     const s = x.student;
     const sent = localStorage.getItem(sentKey(date, s._id));
-    const link = x.num ? `https://wa.me/${x.num}?text=${encodeURIComponent(x.msg)}` : '#';
+    const link = x.num ? waLink(x.num, x.msg) : '#';
     return `<div class="abs-card">
       <div class="abs-top">
         <div>
@@ -134,6 +150,8 @@ function render(date){
       </div>
       <div class="abs-actions">
         <a class="wa-btn ${x.num?'':'off'}" id="wa${i}" href="${link}" target="_blank" onclick="markSent('${date}','${s._id}',${i})">📲 إرسال واتساب لولي الأمر</a>
+        <button class="secondary" onclick="copyMsg(${i})">📋 نسخ الرسالة</button>
+        <span class="sent" id="copied${i}"></span>
         <span class="sent" id="sent${i}">${sent?'✅ تم فتح الرسالة':''}</span>
       </div>
       <details class="msg">
@@ -146,7 +164,7 @@ function render(date){
 
 function updateMsg(i, text){
   rows[i].msg = text;
-  if(rows[i].num) document.getElementById('wa'+i).href = `https://wa.me/${rows[i].num}?text=${encodeURIComponent(text)}`;
+  if(rows[i].num) document.getElementById('wa'+i).href = waLink(rows[i].num, text);
 }
 function markSent(date, id, i){
   localStorage.setItem(sentKey(date,id), '1');
