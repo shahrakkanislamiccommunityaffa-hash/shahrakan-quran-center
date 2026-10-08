@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>التواصل مع المعلمين المتغيبين</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="stylesheet" href="style.css">
+<style>
+.abs-card{border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--card);}
+.abs-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+.abs-name{font-weight:bold;font-size:16px;}
+.abs-meta{color:var(--muted);font-size:13px;margin-top:2px;}
+.abs-phone{direction:ltr;unicode-bidi:embed;font-weight:bold;color:var(--accent-dark);}
+.abs-actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+.wa-btn{background:#25a244;text-decoration:none;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;display:inline-block;}
+.wa-btn.off{opacity:.45;pointer-events:none;}
+.sent{color:var(--accent);font-size:13px;font-weight:bold;}
+.warn{color:var(--danger);font-size:13px;}
+details.msg{margin-top:10px;}
+details.msg summary{cursor:pointer;color:var(--muted);font-size:13px;}
+details.msg textarea{margin-top:8px;min-height:230px;line-height:1.7;}
+</style>
+</head>
+<body>
+<header class="sub">
+  📞 التواصل مع المعلمين المتغيبين
+  <a href="home.html" style="color:#fff;text-decoration:none;">➡ الرئيسية</a>
+</header>
+<main>
+
+<div class="card">
+  <h2>اختيار اليوم</h2>
+  <div class="row">
+    <div><label>تاريخ الغياب</label><input id="absDate" type="date"></div>
+  </div>
+  <p class="hint">المعلم المتغيّب هو أي معلم بالقائمة لم يُسجَّل حضوره بالتاريخ المختار (من صفحة تسجيل حضور المعلمين)، مع رقمه ورسالة واتساب جاهزة.</p>
+</div>
+
+<div class="card">
+  <h2 id="title">المعلمون المتغيبون</h2>
+  <div id="warn" class="warn" style="display:none;margin-bottom:10px;"></div>
+  <div id="list"></div>
+</div>
+
+</main>
+<script>
+async function api(path, opts={}){
+  const res = await fetch(path, { headers:{'Content-Type':'application/json'}, ...opts });
+  if(res.status===401){ location.href='/login.html'; throw new Error('unauth'); }
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || 'خطأ');
+  return data;
+}
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const p2 = n => String(n).padStart(2,'0');
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`; }
+const DAY_NAMES = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+function sortKey(name){
+  return (name||'').trim().replace(/[\u064B-\u065F\u0670]/g,'').replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه');
+}
+
+// "الاثنين 5 أكتوبر 2026"
+function dayLabel(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const dt = new Date(y,m-1,d);
+  return `${DAY_NAMES[dt.getDay()]} ${d} ${MONTHS[m-1]} ${y}`;
+}
+
+// تجهيز الرقم لواتساب: أرقام فقط، و٨ خانات = رقم بحريني بدون مفتاح الدولة
+function waNumber(raw){
+  let n = (raw||'').replace(/[^0-9]/g,'');
+  if(n.startsWith('00')) n = n.slice(2);
+  if(n.length===8) n = '973'+n;
+  return n;
+}
+function waLink(num, text){
+  return `https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(text)}`;
+}
+
+async function copyMsg(i){
+  const text = rows[i].msg;
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  const el = document.getElementById('copied'+i);
+  el.textContent = '✅ تم نسخ الرسالة';
+  setTimeout(()=>{ el.textContent=''; }, 2500);
+}
+
+function buildMessage(teacherName, dateStr){
+  return `السلام عليكم ورحمة الله وبركاته،
+
+تحية طيبة وبعد،،
+
+المكرّم ( *${teacherName}* ) حفظه الله،
+
+نودّ إحاطتكم علماً بأنه لم يُسجَّل حضوركم لدى لجنة تعليم القرآن بمسجد الزهراء (عليها السلام) في قرية شهركان *اليوم* ( *${dayLabel(dateStr)}* ) ، ويسعدنا تواصلكم معنا للاطمئنان عليكم ومعرفة سبب الغياب.
+
+شاكرين ومقدرين جهودكم المباركة وحرصكم على خدمة كتاب الله العزيز وتعليمه لأبنائنا.
+
+ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ
+🔷 *لجنة تعليم القرآن بمسجد الزهراء (عليها السلام) - قرية شهركان*`;
+}
+
+let rows = []; // {teacher, msg, num}
+const sentKey = (date, id) => `tsent:${date}:${id}`;
+
+async function load(){
+  const date = document.getElementById('absDate').value;
+  if(!date) return;
+  const data = await api(`/api/report/teachers?from=${date}&to=${date}`);
+  const presentNames = new Set(data.records.map(r=>r.teacherName));
+
+  rows = data.teachers
+    .filter(t=>!presentNames.has(t.name))
+    .sort((a,b)=>sortKey(a.name).localeCompare(sortKey(b.name),'ar'))
+    .map(t=>({ teacher: t, num: waNumber(t.phone), msg: buildMessage(t.name, date) }));
+
+  const warn = document.getElementById('warn');
+  if(data.teachers.length && !data.records.length){
+    warn.style.display = 'block';
+    warn.textContent = '⚠ ما سُجِّل حضور أي معلم بهذا التاريخ — فكل المعلمين يظهرون كمتغيبين. تأكد إنك سجّلت الحضور من صفحة "تسجيل حضور المعلمين" قبل ما ترسل.';
+  } else warn.style.display = 'none';
+
+  document.getElementById('title').textContent = `المعلمون المتغيبون — ${dayLabel(date)} (${rows.length})`;
+  render(date);
+}
+
+function render(date){
+  const el = document.getElementById('list');
+  if(!rows.length){ el.innerHTML = '<p class="hint">ما فيه معلمين متغيبين بهذا التاريخ.</p>'; return; }
+  el.innerHTML = rows.map((x,i)=>{
+    const t = x.teacher;
+    const sent = localStorage.getItem(sentKey(date, t._id));
+    const link = x.num ? waLink(x.num, x.msg) : '#';
+    return `<div class="abs-card">
+      <div class="abs-top">
+        <div><div class="abs-name">${i+1}. ${esc(t.name)}</div></div>
+        <div>${x.num ? `<span class="abs-phone">${esc(x.num)}</span>` : '<span class="warn">⚠ ما فيه رقم لهذا المعلم — أضفه من صفحة "تسجيل حضور المعلمين"</span>'}</div>
+      </div>
+      <div class="abs-actions">
+        <a class="wa-btn ${x.num?'':'off'}" id="wa${i}" href="${link}" target="_blank" onclick="markSent('${date}','${t._id}',${i})">📲 إرسال واتساب للمعلم</a>
+        <button class="secondary" onclick="copyMsg(${i})">📋 نسخ الرسالة</button>
+        <span class="sent" id="copied${i}"></span>
+        <span class="sent" id="sent${i}">${sent?'✅ تم فتح الرسالة':''}</span>
+      </div>
+      <details class="msg">
+        <summary>عرض / تعديل الرسالة</summary>
+        <textarea oninput="updateMsg(${i}, this.value)">${esc(x.msg)}</textarea>
+      </details>
+    </div>`;
+  }).join('');
+}
+
+function updateMsg(i, text){
+  rows[i].msg = text;
+  if(rows[i].num) document.getElementById('wa'+i).href = waLink(rows[i].num, text);
+}
+function markSent(date, id, i){
+  try{ localStorage.setItem(sentKey(date,id), '1'); }catch(e){}
+  document.getElementById('sent'+i).textContent = '✅ تم فتح الرسالة';
+}
+
+document.getElementById('absDate').value = todayStr();
+document.getElementById('absDate').addEventListener('change', load);
+
+(async function init(){
+  try{ await api('/api/me'); }catch(e){ return; }
+  await load();
+})();
+</script>
+</body>
+</html>

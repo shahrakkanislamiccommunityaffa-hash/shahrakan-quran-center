@@ -33,7 +33,8 @@ AttendanceSchema.index({ studentId: 1, date: 1 }, { unique: true });
 
 // قائمة المعلمين (تنضاف مرة وحدة وتُختار منها عند تسجيل الحضور)
 const TeacherSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true, unique: true }
+  name: { type: String, required: true, trim: true, unique: true },
+  phone: { type: String, trim: true, default: '' }
 });
 
 // سجل حضور معلم: اسمه وتاريخه بس

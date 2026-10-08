@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>كشف الحضور والغياب للطلاب</title>
+<title>كشف حضور وغياب المعلمين</title>
 <link rel="icon" type="image/png" href="logo.png">
 <link rel="stylesheet" href="style.css">
 <style>
@@ -37,7 +37,7 @@ table.rep th small{display:block;font-weight:normal;color:var(--muted);font-size
 </head>
 <body>
 <header class="sub">
-  📋 كشف الحضور والغياب للطلاب
+  📋 كشف حضور وغياب المعلمين
   <a href="home.html" style="color:#fff;text-decoration:none;">➡ الرئيسية</a>
 </header>
 <main class="wide">
@@ -47,10 +47,6 @@ table.rep th small{display:block;font-weight:normal;color:var(--muted);font-size
   <div class="row">
     <div><label>من تاريخ</label><input id="fromDate" type="date" value="2026-09-12"></div>
     <div><label>إلى تاريخ</label><input id="toDate" type="date" value="2026-10-05"></div>
-    <div><label>المرحلة</label>
-      <select id="stageFilter"><option value="">الكل (صفوف وملفات)</option><option value="صفوف">الصفوف</option><option value="ملفات">الملفات (الحلقات)</option></select>
-    </div>
-    <div><label>الصف/الملف</label><select id="groupFilter"><option value="">الكل</option></select></div>
     <div><label>ترتيب الجدول</label>
       <select id="sortBy">
         <option value="alpha">أبجدي (أ ← ي)</option>
@@ -74,10 +70,10 @@ table.rep th small{display:block;font-weight:normal;color:var(--muted);font-size
 </div>
 
 <div class="card">
-  <h3 class="print-title">كشف الحضور والغياب — تعليم القرآن، مركز شهركان الإسلامي</h3>
+  <h3 class="print-title">كشف حضور وغياب المعلمين — تعليم القرآن، مركز شهركان الإسلامي</h3>
   <div class="summary" id="summary"></div>
   <div class="table-wrap"><table class="rep" id="rep"></table></div>
-  <p class="hint" style="margin-top:8px;">✔ حاضر &nbsp; ✘ غائب &nbsp; — لم يُسجَّل</p>
+  <p class="hint" style="margin-top:8px;">✔ حاضر &nbsp; ✘ غائب (لم يُسجَّل حضوره بيوم سُجّل فيه حضور غيره) &nbsp; — لم يُسجَّل حضور أحد بهذا اليوم / يوم لم يأتِ بعد</p>
 </div>
 
 </main>
@@ -92,8 +88,8 @@ async function api(path, opts={}){
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 const DAY_NAMES = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 const p2 = n => String(n).padStart(2,'0');
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`; }
 
-// مفتاح ترتيب أبجدي عربي: يوحّد الألف/الياء/التاء المربوطة ويشيل التشكيل
 function sortKey(name){
   return (name||'').trim()
     .replace(/[\u064B-\u065F\u0670]/g,'')
@@ -112,19 +108,6 @@ function buildDates(from, to, days){
   return out;
 }
 
-let allGroups = [];
-
-function fillGroupFilter(){
-  const stage = document.getElementById('stageFilter').value;
-  const sel = document.getElementById('groupFilter');
-  const keep = sel.value;
-  const list = allGroups
-    .filter(g=>!stage || g.stage===stage)
-    .sort((a,b)=>a.name.localeCompare(b.name,'ar',{numeric:true}));
-  sel.innerHTML = '<option value="">الكل</option>' + list.map(g=>`<option value="${g._id}">${esc(g.name)}</option>`).join('');
-  if(list.some(g=>g._id===keep)) sel.value = keep;
-}
-
 async function loadReport(){
   const from = document.getElementById('fromDate').value;
   const to = document.getElementById('toDate').value;
@@ -132,67 +115,49 @@ async function loadReport(){
   const days = [...document.querySelectorAll('.dayChk:checked')].map(c=>Number(c.value));
   if(!days.length) return alert('اختر يوم واحد على الأقل');
 
-  const data = await api(`/api/report/students?from=${from}&to=${to}`);
-  allGroups = data.groups;
-  fillGroupFilter();
-
-  const stage = document.getElementById('stageFilter').value;
-  const groupId = document.getElementById('groupFilter').value;
-  const groupMap = {};
-  data.groups.forEach(g=>groupMap[g._id]=g);
-
+  const data = await api(`/api/report/teachers?from=${from}&to=${to}`);
   const dates = buildDates(from, to, days);
-  const recMap = {};
-  data.records.forEach(r=>{ recMap[r.studentId+'|'+r.date] = r.status; });
+  const today = todayStr();
+
+  // الحضور مسجَّل فقط، فالغياب = معلم بلا سجل بيوم سُجّل فيه حضور غيره
+  const presentSet = new Set(data.records.map(r=>r.teacherName+'|'+r.date));
+  const dayHasData = {};
+  data.records.forEach(r=>{ dayHasData[r.date] = true; });
+  const stateOf = (name, d) => {
+    if(presentSet.has(name+'|'+d.key)) return 'p';
+    if(dayHasData[d.key] && d.key <= today) return 'a';
+    return 'n';
+  };
 
   const sortBy = document.getElementById('sortBy').value;
-  const counts = {};
-  const students = data.students
-    .filter(s=>{
-      const g = groupMap[s.groupId];
-      if(!g) return false;
-      if(stage && g.stage!==stage) return false;
-      if(groupId && g._id!==groupId) return false;
-      return true;
-    });
-  students.forEach(s=>{
+  const teachers = data.teachers.map(t=>{
     let pc=0, ac=0;
-    dates.forEach(d=>{
-      const st = recMap[s._id+'|'+d.key];
-      if(st==='حاضر') pc++; else if(st==='غائب') ac++;
-    });
-    counts[s._id] = {pc, ac};
+    dates.forEach(d=>{ const st = stateOf(t.name,d); if(st==='p') pc++; else if(st==='a') ac++; });
+    return { t, pc, ac };
   });
-  const alpha = (a,b)=>sortKey(a.name).localeCompare(sortKey(b.name),'ar');
-  students.sort((a,b)=>{
-    const ca = counts[a._id], cb = counts[b._id];
-    if(sortBy==='present' && cb.pc!==ca.pc) return cb.pc-ca.pc;   // الأكثر حضوراً أولاً
-    if(sortBy==='absent' && cb.ac!==ca.ac) return cb.ac-ca.ac;    // الأكثر غياباً أولاً
-    return alpha(a,b); // عند التساوي (أو الترتيب الأبجدي): أبجدي
+  const alpha = (a,b)=>sortKey(a.t.name).localeCompare(sortKey(b.t.name),'ar');
+  teachers.sort((a,b)=>{
+    if(sortBy==='present' && b.pc!==a.pc) return b.pc-a.pc;
+    if(sortBy==='absent' && b.ac!==a.ac) return b.ac-a.ac;
+    return alpha(a,b);
   });
 
-  let html = '<thead><tr><th>#</th><th>اسم الطالب</th><th>الصف/الملف</th><th>الأستاذ</th>';
+  let html = '<thead><tr><th>#</th><th>اسم المعلم</th>';
   dates.forEach(d=>{ html += `<th>${d.label}<small>${DAY_NAMES[d.day]}</small></th>`; });
   html += '<th>حاضر</th><th>غائب</th></tr></thead><tbody>';
-
-  students.forEach((s,i)=>{
-    const g = groupMap[s.groupId];
-    let pc=0, ac=0, cells='';
+  teachers.forEach((x,i)=>{
+    let cells='';
     dates.forEach(d=>{
-      const st = recMap[s._id+'|'+d.key];
-      if(st==='حاضر'){ pc++; cells += '<td class="p">✔</td>'; }
-      else if(st==='غائب'){ ac++; cells += '<td class="a">✘</td>'; }
-      else cells += '<td class="n">—</td>';
+      const st = stateOf(x.t.name, d);
+      cells += st==='p' ? '<td class="p">✔</td>' : st==='a' ? '<td class="a">✘</td>' : '<td class="n">—</td>';
     });
-    html += `<tr><td>${i+1}</td><td class="name">${esc(s.name)}</td><td class="txt">${esc(g.name)}</td><td class="txt">${esc(g.teacher||'—')}</td>${cells}<td class="p">${pc}</td><td class="a">${ac}</td></tr>`;
+    html += `<tr><td>${i+1}</td><td class="name">${esc(x.t.name)}</td>${cells}<td class="p">${x.pc}</td><td class="a">${x.ac}</td></tr>`;
   });
   html += '</tbody>';
-  document.getElementById('rep').innerHTML = students.length ? html : '<tbody><tr><td style="padding:20px;">ما فيه طلاب مطابقين للخيارات المحددة.</td></tr></tbody>';
-  document.getElementById('summary').textContent = `${students.length} طالب — ${dates.length} يوم دراسي (من ${from} إلى ${to})`;
+  document.getElementById('rep').innerHTML = teachers.length ? html : '<tbody><tr><td style="padding:20px;">ما فيه معلمين مضافين بعد — أضفهم من صفحة "تسجيل حضور المعلمين".</td></tr></tbody>';
+  document.getElementById('summary').textContent = `${teachers.length} معلم — ${dates.length} يوم دراسي (من ${from} إلى ${to})`;
 }
 
-document.getElementById('stageFilter').addEventListener('change', ()=>{ fillGroupFilter(); loadReport(); });
-document.getElementById('groupFilter').addEventListener('change', loadReport);
 document.getElementById('sortBy').addEventListener('change', loadReport);
 
 (async function init(){

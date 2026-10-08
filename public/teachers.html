@@ -39,8 +39,10 @@
   <h2>إدارة قائمة المعلمين</h2>
   <div class="row">
     <input id="newTeacher" placeholder="اسم المعلم الجديد">
+    <input id="newTeacherPhone" placeholder="رقم الواتساب (مثال: 97333xxxxxx)">
     <button onclick="addTeacher()">➕ إضافة</button>
   </div>
+  <p class="hint">رقم المعلم يُستخدم فقط لصفحة "التواصل مع المعلمين المتغيبين".</p>
   <div id="teachersManage" style="margin-top:10px;"></div>
 </div>
 
@@ -114,27 +116,58 @@ async function toggle(teacherId){
   await loadList();
 }
 
+let editingTeacherId = null;
+
 function renderManage(){
   const el = document.getElementById('teachersManage');
   if(!teachers.length){ el.innerHTML = '<p class="hint">ما فيه معلمين مضافين بعد.</p>'; return; }
-  el.innerHTML = teachers.map(t=>`
-    <div class="item">
-      <span>${esc(t.name)}</span>
-      <button class="danger" onclick="removeTeacher('${t._id}')">حذف</button>
-    </div>`).join('');
+  el.innerHTML = teachers.map(t=>{
+    if(editingTeacherId===t._id){
+      return `<div class="item" style="flex-wrap:wrap;gap:8px;">
+        <input id="editTName" value="${esc(t.name)}" style="flex:2;min-width:140px;margin:0;">
+        <input id="editTPhone" value="${esc(t.phone||'')}" placeholder="رقم الواتساب" style="flex:2;min-width:140px;margin:0;direction:ltr;text-align:right;">
+        <button onclick="saveTeacher('${t._id}')">💾 حفظ</button>
+        <button class="secondary" onclick="cancelEditTeacher()">إلغاء</button>
+      </div>`;
+    }
+    return `<div class="item">
+      <span><strong>${esc(t.name)}</strong> ${t.phone ? `<span class="hint" style="direction:ltr;unicode-bidi:embed;">— ${esc(t.phone)}</span>` : '<span class="hint">— ⚠ بدون رقم</span>'}</span>
+      <span>
+        <button class="secondary" onclick="editTeacher('${t._id}')">✏️ تعديل</button>
+        <button class="danger" onclick="removeTeacher('${t._id}')">حذف</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function editTeacher(id){ editingTeacherId = id; renderManage(); }
+function cancelEditTeacher(){ editingTeacherId = null; renderManage(); }
+async function saveTeacher(id){
+  const name = document.getElementById('editTName').value.trim();
+  const phone = document.getElementById('editTPhone').value.trim();
+  if(!name) return alert('اكتب اسم المعلم');
+  try{
+    await api('/api/teachers/'+id, {method:'PUT', body: JSON.stringify({name, phone})});
+    editingTeacherId = null;
+    await loadTeachers();
+    await loadList();
+  }catch(e){ alert(e.message); }
 }
 
 async function addTeacher(){
   const input = document.getElementById('newTeacher');
+  const phoneInput = document.getElementById('newTeacherPhone');
   const name = input.value.trim();
+  const phone = phoneInput.value.trim();
   if(!name) return alert('اكتب اسم المعلم');
   try{
-    await api('/api/teachers', {method:'POST', body: JSON.stringify({name})});
-    input.value = '';
+    await api('/api/teachers', {method:'POST', body: JSON.stringify({name, phone})});
+    input.value = ''; phoneInput.value = '';
     await loadTeachers();
   }catch(e){ alert(e.message); }
 }
 document.getElementById('newTeacher').addEventListener('keydown', e=>{ if(e.key==='Enter') addTeacher(); });
+document.getElementById('newTeacherPhone').addEventListener('keydown', e=>{ if(e.key==='Enter') addTeacher(); });
 
 async function removeTeacher(id){
   const t = teachers.find(x=>x._id===id);

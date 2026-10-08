@@ -177,6 +177,17 @@ app.get('/api/report/students', requireAuth, async (req, res) => {
   res.json({ groups, students, records });
 });
 
+// ---------- كشف حضور وغياب المعلمين (تقرير) ----------
+app.get('/api/report/teachers', requireAuth, async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) return res.status(400).json({ error: 'حدد تاريخ البداية والنهاية' });
+  const [teachers, records] = await Promise.all([
+    Teacher.find().collation({ locale: 'ar' }).sort({ name: 1 }),
+    TeacherAttendance.find({ date: { $gte: from, $lte: to } })
+  ]);
+  res.json({ teachers, records });
+});
+
 // ---------- قائمة المعلمين ----------
 app.get('/api/teachers', requireAuth, async (req, res) => {
   const teachers = await Teacher.find().collation({ locale: 'ar' }).sort({ name: 1 });
@@ -188,7 +199,29 @@ app.post('/api/teachers', requireAuth, async (req, res) => {
   if (!name) return res.status(400).json({ error: 'اسم المعلم مطلوب' });
   const exists = await Teacher.findOne({ name });
   if (exists) return res.status(400).json({ error: 'هذا المعلم موجود مسبقاً' });
-  const teacher = await Teacher.create({ name });
+  const phone = (req.body?.phone || '').replace(/[^0-9]/g, '');
+  const teacher = await Teacher.create({ name, phone });
+  res.json(teacher);
+});
+
+app.put('/api/teachers/:id', requireAuth, async (req, res) => {
+  const { name, phone } = req.body || {};
+  const update = {};
+  if (name !== undefined) {
+    const n = name.trim();
+    if (!n) return res.status(400).json({ error: 'اسم المعلم مطلوب' });
+    const dup = await Teacher.findOne({ name: n, _id: { $ne: req.params.id } });
+    if (dup) return res.status(400).json({ error: 'هذا الاسم موجود مسبقاً' });
+    update.name = n;
+  }
+  if (phone !== undefined) update.phone = String(phone).replace(/[^0-9]/g, '');
+  const before = await Teacher.findById(req.params.id);
+  if (!before) return res.status(404).json({ error: 'غير موجود' });
+  const teacher = await Teacher.findByIdAndUpdate(req.params.id, update, { new: true });
+  // نبقي سجلات الحضور القديمة مربوطة بالمعلم لو تغيّر اسمه
+  if (update.name && update.name !== before.name) {
+    await TeacherAttendance.updateMany({ teacherName: before.name }, { teacherName: update.name });
+  }
   res.json(teacher);
 });
 
