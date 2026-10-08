@@ -14,6 +14,9 @@
 .t-btn:hover{background:transparent;border-color:var(--accent);}
 .t-btn.on{background:var(--accent);border-color:var(--accent);color:#fff;}
 .t-btn.on:hover{background:var(--accent-dark);}
+.t-btn{min-width:80px;}
+.t-btn.off{background:var(--danger);border-color:var(--danger);color:#fff;}
+.t-btn.off:hover{background:var(--danger);}
 </style>
 </head>
 <body>
@@ -31,7 +34,7 @@
       <input id="tDate" type="date">
     </div>
   </div>
-  <p class="hint">اضغط على الزر جنب اسم المعلم لتسجيل حضوره بهذا التاريخ، واضغط مرة ثانية لإلغاء التسجيل.</p>
+  <p class="hint">اضغط «حاضر» أو «غائب» جنب اسم المعلم، واضغط نفس الزر مرة ثانية لإلغاء التسجيل.</p>
   <div id="teachersAttendance"></div>
 </div>
 
@@ -100,18 +103,20 @@ function renderAttendance(){
     const rec = dayRecords.find(r=>r.teacherName===t.name);
     return `<div class="t-row">
       <span class="t-name">${esc(t.name)}</span>
-      <button class="t-btn ${rec?'on':''}" onclick="toggle('${t._id}')">${rec?'✅ حاضر':'تسجيل حضور'}</button>
+      <button class="t-btn ${rec&&rec.status!=='غائب'?'on':''}" onclick="setStatus('${t._id}','حاضر')">${rec&&rec.status!=='غائب'?'✅ حاضر':'حاضر'}</button>
+      <button class="t-btn ${rec&&rec.status==='غائب'?'off':''}" onclick="setStatus('${t._id}','غائب')">${rec&&rec.status==='غائب'?'❌ غائب':'غائب'}</button>
     </div>`;
   }).join('');
 }
 
-async function toggle(teacherId){
+async function setStatus(teacherId, status){
   const t = teachers.find(x=>x._id===teacherId);
   const date = document.getElementById('tDate').value;
   if(!t || !date) return alert('اختر التاريخ');
   const rec = dayRecords.find(r=>r.teacherName===t.name);
-  if(rec) await api('/api/teacher-attendance/'+rec._id, {method:'DELETE'});
-  else await api('/api/teacher-attendance', {method:'POST', body: JSON.stringify({teacherName: t.name, date})});
+  const cur = rec ? (rec.status==='غائب' ? 'غائب' : 'حاضر') : null;
+  if(cur===status) await api('/api/teacher-attendance/'+rec._id, {method:'DELETE'}); // ضغطة ثانية = إلغاء
+  else await api('/api/teacher-attendance', {method:'POST', body: JSON.stringify({teacherName: t.name, date, status})});
   await loadDay();
   await loadList();
 }
@@ -191,7 +196,7 @@ async function loadList(){
   if(!records.length){ el.innerHTML = '<p class="hint">ما فيه سجلات.</p>'; return; }
   el.innerHTML = records.map(r=>`
     <div class="item">
-      <span><strong>${esc(r.teacherName)}</strong> — ${esc(r.date)}</span>
+      <span><strong>${esc(r.teacherName)}</strong> — ${esc(r.date)} — ${r.status==='غائب'?'❌ غائب':'✅ حاضر'}</span>
       <button class="danger" onclick="removeRecord('${r._id}')">حذف</button>
     </div>`).join('');
 }

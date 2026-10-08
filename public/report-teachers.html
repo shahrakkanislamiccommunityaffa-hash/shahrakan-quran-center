@@ -80,7 +80,7 @@ table.rep th small{display:block;font-weight:normal;color:var(--muted);font-size
   <h3 class="print-title">كشف حضور وغياب المعلمين — تعليم القرآن، مركز شهركان الإسلامي</h3>
   <div class="summary" id="summary"></div>
   <div class="table-wrap"><table class="rep" id="rep"></table></div>
-  <p class="hint" style="margin-top:8px;">✔ حاضر &nbsp; ✘ غائب (لم يُسجَّل حضوره بيوم سُجّل فيه حضور غيره) &nbsp; — لم يُسجَّل حضور أحد بهذا اليوم / يوم لم يأتِ بعد</p>
+  <p class="hint" style="margin-top:8px;">✔ حاضر &nbsp; ✘ غائب &nbsp; — لم تُسجَّل حالته</p>
 </div>
 
 </main>
@@ -127,12 +127,18 @@ async function loadReport(){
   const today = todayStr();
 
   // الحضور مسجَّل فقط، فالغياب = معلم بلا سجل بيوم سُجّل فيه حضور غيره
-  const presentSet = new Set(data.records.map(r=>r.teacherName+'|'+r.date));
-  const dayHasData = {};
-  data.records.forEach(r=>{ dayHasData[r.date] = true; });
+  // الحالة المسجلة صراحةً (حاضر/غائب). الأيام القديمة (سجلات بدون حالة): بلا سجل بيوم فيه حضور = غائب
+  const recState = {};
+  const dayHasData = {}, dayExplicit = {};
+  data.records.forEach(r=>{
+    recState[r.teacherName+'|'+r.date] = r.status==='غائب' ? 'a' : 'p';
+    dayHasData[r.date] = true;
+    if(r.status) dayExplicit[r.date] = true;
+  });
   const stateOf = (name, d) => {
-    if(presentSet.has(name+'|'+d.key)) return 'p';
-    if(dayHasData[d.key] && d.key <= today) return 'a';
+    const s = recState[name+'|'+d.key];
+    if(s) return s;
+    if(!dayExplicit[d.key] && dayHasData[d.key] && d.key <= today) return 'a';
     return 'n';
   };
 

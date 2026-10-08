@@ -40,7 +40,8 @@ const TeacherSchema = new mongoose.Schema({
 // سجل حضور معلم: اسمه وتاريخه بس
 const TeacherAttendanceSchema = new mongoose.Schema({
   teacherName: { type: String, required: true, trim: true },
-  date: { type: String, required: true } // YYYY-MM-DD
+  date: { type: String, required: true }, // YYYY-MM-DD
+  status: { type: String, enum: ['حاضر','غائب'] } // السجلات القديمة بدون حالة = حاضر
 }, { timestamps: true });
 
 module.exports = {

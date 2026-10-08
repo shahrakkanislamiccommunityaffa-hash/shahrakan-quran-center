@@ -110,17 +110,29 @@ async function load(){
   const date = document.getElementById('absDate').value;
   if(!date) return;
   const data = await api(`/api/report/teachers?from=${date}&to=${date}`);
-  const presentNames = new Set(data.records.map(r=>r.teacherName));
+  const recByName = {};
+  data.records.forEach(r=>{ recByName[r.teacherName] = r.status==='غائب' ? 'غائب' : 'حاضر'; });
+  // يوم قديم (سجلات بدون حالة): بلا سجل = غائب. يوم فيه حالات صريحة: الغائب هو اللي مُعلَّم «غائب» فقط
+  const explicit = data.records.some(r=>r.status);
+  const isAbsent = t => {
+    const s = recByName[t.name];
+    if(s) return s==='غائب';
+    return !explicit && data.records.length>0;
+  };
 
   rows = data.teachers
-    .filter(t=>!presentNames.has(t.name))
+    .filter(isAbsent)
     .sort((a,b)=>sortKey(a.name).localeCompare(sortKey(b.name),'ar'))
     .map(t=>({ teacher: t, num: waNumber(t.phone), msg: buildMessage(t.name, date) }));
 
   const warn = document.getElementById('warn');
+  const unmarked = data.teachers.filter(t=>!recByName[t.name]).length;
   if(data.teachers.length && !data.records.length){
     warn.style.display = 'block';
-    warn.textContent = '⚠ ما سُجِّل حضور أي معلم بهذا التاريخ — فكل المعلمين يظهرون كمتغيبين. تأكد إنك سجّلت الحضور من صفحة "تسجيل حضور المعلمين" قبل ما ترسل.';
+    warn.textContent = '⚠ ما سُجِّل حضور ولا غياب لأي معلم بهذا التاريخ. سجّل الحالة من صفحة "تسجيل حضور المعلمين" ثم ارجع هنا.';
+  } else if(explicit && unmarked){
+    warn.style.display = 'block';
+    warn.textContent = `ℹ ${unmarked} معلم ما سُجِّلت لهم حالة (حاضر/غائب) بهذا التاريخ، ولا يظهرون هنا.`;
   } else warn.style.display = 'none';
 
   document.getElementById('title').textContent = `المعلمون المتغيبون — ${dayLabel(date)} (${rows.length})`;

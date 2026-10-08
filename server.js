@@ -240,12 +240,13 @@ app.get('/api/teacher-attendance', requireAuth, async (req, res) => {
 
 app.post('/api/teacher-attendance', requireAuth, async (req, res) => {
   const { teacherName, date } = req.body || {};
+  const status = req.body && req.body.status === 'غائب' ? 'غائب' : 'حاضر';
   if (!teacherName || !date) return res.status(400).json({ error: 'اسم المعلم والتاريخ مطلوبين' });
   const name = teacherName.trim();
-  // لا نكرر نفس المعلم بنفس اليوم
+  // لا نكرر نفس المعلم بنفس اليوم: نحدّث الحالة فقط
   const existing = await TeacherAttendance.findOne({ teacherName: name, date });
-  if (existing) return res.json(existing);
-  const record = await TeacherAttendance.create({ teacherName: name, date });
+  if (existing) { existing.status = status; await existing.save(); return res.json(existing); }
+  const record = await TeacherAttendance.create({ teacherName: name, date, status });
   res.json(record);
 });
 
