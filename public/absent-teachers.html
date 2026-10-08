@@ -53,6 +53,8 @@ async function api(path, opts={}){
   return data;
 }
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let rows = [];
+const sentKey = (date, id) => 'tsent:'+date+':'+id;
 const p2 = n => String(n).padStart(2,'0');
 function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`; }
 const DAY_NAMES = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
