@@ -47,6 +47,13 @@ table.rep th small{display:block;font-weight:normal;color:var(--muted);font-size
   <div class="row">
     <div><label>من تاريخ</label><input id="fromDate" type="date" value="2026-09-12"></div>
     <div><label>إلى تاريخ</label><input id="toDate" type="date" value="2026-10-05"></div>
+    <div><label>عرض</label>
+      <select id="statusFilter">
+        <option value="">الكل</option>
+        <option value="absent">الغايبين فقط</option>
+        <option value="present">الحاضرين فقط</option>
+      </select>
+    </div>
     <div><label>ترتيب الجدول</label>
       <select id="sortBy">
         <option value="alpha">أبجدي (أ ← ي)</option>
@@ -135,6 +142,8 @@ async function loadReport(){
     dates.forEach(d=>{ const st = stateOf(t.name,d); if(st==='p') pc++; else if(st==='a') ac++; });
     return { t, pc, ac };
   });
+  const sf = document.getElementById('statusFilter').value;
+  for(let i=teachers.length-1;i>=0;i--){ const x=teachers[i]; if((sf==='absent'&&x.ac===0)||(sf==='present'&&x.pc===0)) teachers.splice(i,1); }
   const alpha = (a,b)=>sortKey(a.t.name).localeCompare(sortKey(b.t.name),'ar');
   teachers.sort((a,b)=>{
     if(sortBy==='present' && b.pc!==a.pc) return b.pc-a.pc;
@@ -159,6 +168,7 @@ async function loadReport(){
 }
 
 document.getElementById('sortBy').addEventListener('change', loadReport);
+document.getElementById('statusFilter').addEventListener('change', loadReport);
 
 (async function init(){
   try{ await api('/api/me'); }catch(e){ return; }

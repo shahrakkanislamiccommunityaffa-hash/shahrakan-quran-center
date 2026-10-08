@@ -51,6 +51,13 @@ table.rep th small{display:block;font-weight:normal;color:var(--muted);font-size
       <select id="stageFilter"><option value="">الكل (صفوف وملفات)</option><option value="صفوف">الصفوف</option><option value="ملفات">الملفات (الحلقات)</option></select>
     </div>
     <div><label>الصف/الملف</label><select id="groupFilter"><option value="">الكل</option></select></div>
+    <div><label>عرض</label>
+      <select id="statusFilter">
+        <option value="">الكل</option>
+        <option value="absent">الغايبين فقط</option>
+        <option value="present">الحاضرين فقط</option>
+      </select>
+    </div>
     <div><label>ترتيب الجدول</label>
       <select id="sortBy">
         <option value="alpha">أبجدي (أ ← ي)</option>
@@ -163,6 +170,8 @@ async function loadReport(){
     });
     counts[s._id] = {pc, ac};
   });
+  const sf = document.getElementById('statusFilter').value;
+  for(let i=students.length-1;i>=0;i--){ const c=counts[students[i]._id]; if((sf==='absent'&&c.ac===0)||(sf==='present'&&c.pc===0)) students.splice(i,1); }
   const alpha = (a,b)=>sortKey(a.name).localeCompare(sortKey(b.name),'ar');
   students.sort((a,b)=>{
     const ca = counts[a._id], cb = counts[b._id];
@@ -191,9 +200,12 @@ async function loadReport(){
   document.getElementById('summary').textContent = `${students.length} طالب — ${dates.length} يوم دراسي (من ${from} إلى ${to})`;
 }
 
+
+
 document.getElementById('stageFilter').addEventListener('change', ()=>{ fillGroupFilter(); loadReport(); });
 document.getElementById('groupFilter').addEventListener('change', loadReport);
 document.getElementById('sortBy').addEventListener('change', loadReport);
+document.getElementById('statusFilter').addEventListener('change', loadReport);
 
 (async function init(){
   try{ await api('/api/me'); }catch(e){ return; }
